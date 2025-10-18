@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ticket App
+
+A simple ticket management application built with Next.js and Supabase authentication.
+
+## Features
+
+- 🔐 Email/Password authentication with Supabase
+- 🎨 Modern, responsive UI with TailwindCSS
+- 📱 Mobile-friendly design
+- 🚀 Built with Next.js 15 and React 19
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+ installed
+- A Supabase account and project
+
+### Setup
+
+1. **Clone and install dependencies:**
+   ```bash
+   cd ticketapp
+   npm install
+   ```
+
+2. **Set up Supabase:**
+   - Create a new project at [supabase.com](https://supabase.com)
+   - Go to Settings > API to get your project URL and anon key
+   - Copy `.env.local.example` to `.env.local`:
+     ```bash
+     cp .env.local.example .env.local
+     ```
+   - Fill in your Supabase credentials in `.env.local`:
+     ```
+     SUPABASE_URL=your_supabase_url_here
+     SUPABASE_ANON_KEY=your_supabase_anon_key_here
+     ```
+
+3. **Enable Email Authentication in Supabase:**
+   - Go to Authentication > Settings in your Supabase dashboard
+   - Make sure "Enable email confirmations" is configured as needed
+   - Configure your site URL (for development: `http://localhost:3000`)
+
+4. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open your browser:**
+   Visit [http://localhost:3000](http://localhost:3000) to see the app.
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── auth/          # Authentication page
+│   ├── dashboard/     # Dashboard page (after login)
+│   ├── layout.tsx     # Root layout
+│   └── page.tsx       # Home page (redirects to auth or dashboard)
+└── lib/
+    └── supabase.ts    # Supabase client configuration
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Usage
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Sign Up:** Create a new account with email and password
+2. **Sign In:** Log in with your credentials
+3. **Dashboard:** View your ticket management dashboard
+4. **Sign Out:** Log out securely
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tech Stack
 
-## Learn More
+- **Framework:** Next.js 15
+- **Authentication:** Supabase Auth
+- **Styling:** TailwindCSS
+- **Language:** TypeScript
+- **Database:** Supabase (PostgreSQL)
 
-To learn more about Next.js, take a look at the following resources:
+## Next Steps
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This is a basic authentication setup. You can extend it by:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Adding ticket creation and management features
+- Implementing role-based access control
+- Adding real-time updates with Supabase Realtime
+- Creating ticket categories and priorities
+- Adding file attachments to tickets
+- Implementing email notifications
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Remember to add your environment variables to your Vercel deployment settings.
