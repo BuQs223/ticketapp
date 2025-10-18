@@ -101,7 +101,7 @@ export default function Dashboard() {
               🎉 Welcome to Ticket App!
             </h3>
             <p className="text-indigo-700">
-              You've successfully authenticated with Supabase. This is your dashboard where you can manage tickets.
+              You&apos;ve successfully authenticated with Supabase. This is your dashboard where you can manage tickets.
               Future features will include creating, viewing, and managing support tickets.
             </p>
           </div>

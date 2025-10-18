@@ -19,7 +19,7 @@ export default function AuthPage() {
 
     try {
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
@@ -31,7 +31,7 @@ export default function AuthPage() {
           router.push('/dashboard')
         }
       } else {
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
         })
@@ -42,7 +42,7 @@ export default function AuthPage() {
           setMessage('Check your email to confirm your account!')
         }
       }
-    } catch (error) {
+    } catch {
       setMessage('An unexpected error occurred')
     } finally {
       setLoading(false)
