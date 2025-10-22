@@ -38,47 +38,84 @@ export default function AuthPage() {
     setIsDarkMode(!isDarkMode)
   }
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage('')
+const handleAuth = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setLoading(true)
+  setMessage('')
 
-    try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
+  try {
+    if (isLogin) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-        if (error) {
-          setMessage(error.message)
-          setMessageType('error')
-        } else {
-          setMessage('Login successful!')
-          setMessageType('success')
-          setTimeout(() => router.push('/dashboard'), 1000)
-        }
+      if (error) {
+        setMessage(error.message)
+        setMessageType('error')
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-        })
+        setMessage('Login successful!')
+        setMessageType('success')
 
-        if (error) {
-          setMessage(error.message)
+        // NEW: decide destination based on membership
+        const {
+          data: { user },
+          error: userErr,
+        } = await supabase.auth.getUser()
+        if (userErr || !user) {
+          setMessage('Could not get user after login')
           setMessageType('error')
+          return
+        }
+
+        const [{ data: factoryMember, error: fErr }, { data: gymMember, error: gErr }] =
+          await Promise.all([
+            supabase
+              .from('factory_members')
+              .select('approved_at')
+              .eq('user_id', user.id)
+              .order('approved_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            supabase
+              .from('gym_members')
+              .select('approved_at')
+              .eq('user_id', user.id)
+              .order('approved_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+          ])
+
+        // Optional: quick error logging for debugging
+        if (fErr || gErr) {
+          console.warn('membership fetch error', { fErr, gErr })
+        }
+
+        if (factoryMember?.approved_at) {
+          router.push('/factory')
+        } else if (gymMember?.approved_at) {
+          router.push('/gym')
         } else {
-          setMessage('Check your email to confirm your account!')
-          setMessageType('success')
+          router.push('/dashboard')
         }
       }
-    } catch {
-      setMessage('An unexpected error occurred')
-      setMessageType('error')
-    } finally {
-      setLoading(false)
+    } else {
+      const { error } = await supabase.auth.signUp({ email, password })
+      if (error) {
+        setMessage(error.message)
+        setMessageType('error')
+      } else {
+        setMessage('Check your email to confirm your account!')
+        setMessageType('success')
+      }
     }
+  } catch {
+    setMessage('An unexpected error occurred')
+    setMessageType('error')
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <div

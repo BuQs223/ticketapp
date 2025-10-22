@@ -16,9 +16,37 @@ export default function Dashboard() {
       
       if (!user) {
         router.push('/auth')
-      } else {
-        setUser(user)
+        return
       }
+
+      // Check if user is a factory member
+      const { data: factoryMember } = await supabase
+        .from('factory_members')
+        .select('role, approved_at')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (factoryMember && factoryMember.approved_at) {
+        // Redirect to factory dashboard
+        router.push('/factory')
+        return
+      }
+
+      // Check if user is a gym member
+      const { data: gymMember } = await supabase
+        .from('gym_members')
+        .select('role, approved_at')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (gymMember && gymMember.approved_at) {
+        // Redirect to gym dashboard (to be implemented)
+        router.push('/gym')
+        return
+      }
+
+      // Default: show generic dashboard or redirect to setup
+      setUser(user)
       setLoading(false)
     }
 
