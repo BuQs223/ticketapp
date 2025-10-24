@@ -37,6 +37,25 @@ export default function EquipmentFormModal({ equipment, factoryId, userId, onClo
     gym_id: ''
   })
   const [loading, setLoading] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(false)
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme')
+    setIsDarkMode(savedTheme === 'dark')
+    
+    const handleStorageChange = () => {
+      const theme = localStorage.getItem('theme')
+      setIsDarkMode(theme === 'dark')
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    const interval = setInterval(handleStorageChange, 100)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     fetchGyms()
@@ -120,14 +139,20 @@ export default function EquipmentFormModal({ equipment, factoryId, userId, onClo
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">
+      <div className={`rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto transition-colors ${
+        isDarkMode ? 'bg-zinc-900' : 'bg-white'
+      }`}>
+        <div className={`sticky top-0 border-b px-6 py-4 flex justify-between items-center ${
+          isDarkMode ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-gray-200'
+        }`}>
+          <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
             {equipment ? 'Edit Equipment' : 'Add New Equipment'}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className={`p-2 rounded-lg transition-colors ${
+              isDarkMode ? 'hover:bg-zinc-800 text-gray-300' : 'hover:bg-gray-100 text-gray-600'
+            }`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -135,7 +160,9 @@ export default function EquipmentFormModal({ equipment, factoryId, userId, onClo
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={`block text-sm font-medium mb-1 ${
+              isDarkMode ? 'text-gray-200' : 'text-gray-700'
+            }`}>
               Equipment Name *
             </label>
             <input
@@ -143,13 +170,19 @@ export default function EquipmentFormModal({ equipment, factoryId, userId, onClo
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-3 py-2 border rounded-lg transition-colors ${
+                isDarkMode
+                  ? 'bg-zinc-800 border-zinc-700 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500'
+                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500'
+              }`}
               placeholder="e.g., Treadmill ProMax 3000"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={`block text-sm font-medium mb-1 ${
+              isDarkMode ? 'text-gray-200' : 'text-gray-700'
+            }`}>
               Serial Number *
             </label>
             <input
@@ -158,24 +191,36 @@ export default function EquipmentFormModal({ equipment, factoryId, userId, onClo
               disabled={!!equipment}
               value={formData.serial_number}
               onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className={`w-full px-3 py-2 border rounded-lg transition-colors disabled:cursor-not-allowed ${
+                isDarkMode
+                  ? 'bg-zinc-800 border-zinc-700 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500 disabled:bg-zinc-800/50 disabled:text-gray-500'
+                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100'
+              }`}
               placeholder="e.g., SN-2024-001"
             />
             {equipment && (
-              <p className="text-xs text-gray-500 mt-1">Serial number cannot be changed</p>
+              <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Serial number cannot be changed
+              </p>
             )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-200' : 'text-gray-700'
+              }`}>
                 Equipment Type *
               </label>
               <select
                 required
                 value={formData.equipment_type}
                 onChange={(e) => setFormData({ ...formData, equipment_type: e.target.value as EquipmentType })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-3 py-2 border rounded-lg transition-colors ${
+                  isDarkMode
+                    ? 'bg-zinc-800 border-zinc-700 text-white focus:ring-blue-500 focus:border-blue-500'
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500'
+                }`}
               >
                 {EQUIPMENT_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -186,14 +231,20 @@ export default function EquipmentFormModal({ equipment, factoryId, userId, onClo
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-200' : 'text-gray-700'
+              }`}>
                 Muscle Group *
               </label>
               <select
                 required
                 value={formData.muscle_group}
                 onChange={(e) => setFormData({ ...formData, muscle_group: e.target.value as MuscleGroup })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-3 py-2 border rounded-lg transition-colors ${
+                  isDarkMode
+                    ? 'bg-zinc-800 border-zinc-700 text-white focus:ring-blue-500 focus:border-blue-500'
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500'
+                }`}
               >
                 {MUSCLE_GROUPS.map((group) => (
                   <option key={group} value={group}>
@@ -206,14 +257,20 @@ export default function EquipmentFormModal({ equipment, factoryId, userId, onClo
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-200' : 'text-gray-700'
+              }`}>
                 Status *
               </label>
               <select
                 required
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as EquipmentStatus })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-3 py-2 border rounded-lg transition-colors ${
+                  isDarkMode
+                    ? 'bg-zinc-800 border-zinc-700 text-white focus:ring-blue-500 focus:border-blue-500'
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500'
+                }`}
               >
                 {STATUSES.map((status) => (
                   <option key={status} value={status}>
@@ -224,13 +281,19 @@ export default function EquipmentFormModal({ equipment, factoryId, userId, onClo
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-200' : 'text-gray-700'
+              }`}>
                 Assigned Gym
               </label>
               <select
                 value={formData.gym_id}
                 onChange={(e) => setFormData({ ...formData, gym_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-3 py-2 border rounded-lg transition-colors ${
+                  isDarkMode
+                    ? 'bg-zinc-800 border-zinc-700 text-white focus:ring-blue-500 focus:border-blue-500'
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500'
+                }`}
               >
                 <option value="">Unassigned</option>
                 {gyms.map((gym) => (
@@ -242,11 +305,17 @@ export default function EquipmentFormModal({ equipment, factoryId, userId, onClo
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t">
+          <div className={`flex justify-end space-x-3 pt-4 border-t ${
+            isDarkMode ? 'border-zinc-700' : 'border-gray-200'
+          }`}>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                isDarkMode
+                  ? 'text-gray-200 bg-zinc-800 hover:bg-zinc-700'
+                  : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+              }`}
             >
               Cancel
             </button>

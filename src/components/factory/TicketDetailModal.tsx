@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { X, CheckCircle, XCircle, MessageSquare, Image as ImageIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { formatDate } from '@/lib/date-utils'
 import type { TicketStatus } from '@/types/database'
 
 interface Props {
@@ -19,6 +20,21 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
   const [visitRequest, setVisitRequest] = useState<any | null>(null)
   const [comment, setComment] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(false)
+
+  useEffect(() => {
+    const checkTheme = () => {
+      const theme = localStorage.getItem('theme')
+      setIsDarkMode(theme === 'dark')
+    }
+    checkTheme()
+    window.addEventListener('storage', checkTheme)
+    const interval = setInterval(checkTheme, 100)
+    return () => {
+      window.removeEventListener('storage', checkTheme)
+      clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     fetchTicketEvents()
@@ -36,12 +52,15 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
   }
 
   const fetchVisitRequest = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('factory_visit_requests')
       .select('*')
       .eq('ticket_id', ticket.id)
-      .single()
+      .maybeSingle()
 
+    if (error) {
+      console.error('Error fetching visit request:', error)
+    }
     setVisitRequest(data)
   }
 
@@ -106,7 +125,7 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
     }
   }
 
-  const handleApproveVisit = async () => {
+  const handleCoRequest = async () => {
     if (!visitRequest) return
 
     setLoading(true)
@@ -115,7 +134,45 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
       const { error } = await supabase
         .from('factory_visit_requests')
         .update({
-          approval_status: 'approved',
+          requested_by_factory_employee: true,
+          factory_employee_user_id: userId,
+          requested_by_factory_employee_at: new Date().toISOString()
+        })
+        .eq('ticket_id', ticket.id)
+
+      if (error) throw error
+
+      // Update ticket status to factory_visit_requested if gym also requested
+      if (visitRequest.requested_by_gym_owner) {
+        await handleStatusUpdate('factory_visit_requested')
+      }
+      
+      toast.success('Factory visit co-requested successfully')
+      onClose() // Refresh by closing
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to co-request visit')
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApproveVisit = async () => {
+    if (!visitRequest) return
+    
+    // Check if both requests are present
+    if (!visitRequest.requested_by_gym_owner || !visitRequest.requested_by_factory_employee) {
+      toast.error('Both gym owner and factory employee must request the visit before approval')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const { error } = await supabase
+        .from('factory_visit_requests')
+        .update({
+          approval: 'approved',
           approved_by: userId,
           approved_at: new Date().toISOString()
         })
@@ -127,6 +184,7 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
       await handleStatusUpdate('factory_visit_approved')
       
       toast.success('Factory visit approved')
+      onClose() // Refresh by closing
     } catch (error: any) {
       toast.error(error.message || 'Failed to approve visit')
       console.error(error)
@@ -147,10 +205,9 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
       const { error } = await supabase
         .from('factory_visit_requests')
         .update({
-          approval_status: 'rejected',
+          approval: 'rejected',
           approved_by: userId,
-          approved_at: new Date().toISOString(),
-          rejection_reason: reason
+          approved_at: new Date().toISOString()
         })
         .eq('ticket_id', ticket.id)
 
@@ -160,6 +217,7 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
       await handleStatusUpdate('rejected')
       
       toast.success('Factory visit rejected')
+      onClose() // Refresh by closing
     } catch (error: any) {
       toast.error(error.message || 'Failed to reject visit')
       console.error(error)
@@ -168,19 +226,40 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
     }
   }
 
+  const canCoRequest = visitRequest && 
+                       !visitRequest.requested_by_factory_employee &&
+                       visitRequest.requested_by_gym_owner &&
+                       visitRequest.approval === 'pending'
+
   const canApproveVisit = (role === 'owner' || role === 'approver') && 
                           visitRequest && 
-                          visitRequest.approval_status === 'pending'
+                          visitRequest.approval === 'pending' &&
+                          visitRequest.requested_by_gym_owner &&
+                          visitRequest.requested_by_factory_employee
+
+  const inputClass = `w-full px-3 py-2 rounded-lg border transition-colors ${
+    isDarkMode
+      ? 'bg-zinc-800 border-zinc-700 text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500/20'
+      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500/20'
+  } focus:outline-none focus:ring-2`
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className={`rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto transition-colors ${
+        isDarkMode ? 'bg-zinc-900 text-gray-100' : 'bg-white text-gray-900'
+      }`}>
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">Ticket Details</h2>
+        <div className={`sticky top-0 border-b px-6 py-4 flex justify-between items-center transition-colors ${
+          isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'
+        }`}>
+          <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+            Ticket Details
+          </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className={`p-2 rounded-lg transition-colors ${
+              isDarkMode ? 'hover:bg-zinc-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+            }`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -191,78 +270,118 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
           <div>
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">{ticket.equipment?.name}</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                  {ticket.equipment?.name}
+                </h3>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   {ticket.gyms?.name} • SN: {ticket.equipment?.serial_number}
                 </p>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                ticket.priority === 'high' ? 'bg-red-100 text-red-800' :
-                ticket.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-green-100 text-green-800'
+                ticket.priority === 'high' 
+                  ? isDarkMode ? 'bg-red-500/10 text-red-300 border border-red-500/30' : 'bg-red-100 text-red-800'
+                  : ticket.priority === 'medium' 
+                    ? isDarkMode ? 'bg-yellow-500/10 text-yellow-300 border border-yellow-500/30' : 'bg-yellow-100 text-yellow-800'
+                    : isDarkMode ? 'bg-green-500/10 text-green-300 border border-green-500/30' : 'bg-green-100 text-green-800'
               }`}>
                 {ticket.priority.toUpperCase()} PRIORITY
               </span>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-2">Description:</p>
-              <p className="text-gray-900">{ticket.description}</p>
+            <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-zinc-800' : 'bg-gray-50'}`}>
+              <p className={`text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Description:
+              </p>
+              <p className={isDarkMode ? 'text-gray-100' : 'text-gray-900'}>{ticket.description}</p>
             </div>
 
             {ticket.photo_url && (
               <div className="mt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Photo:</p>
+                <p className={`text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Photo:
+                </p>
                 <img 
                   src={ticket.photo_url} 
                   alt="Ticket" 
-                  className="max-w-md rounded-lg border"
+                  className={`max-w-md rounded-lg border ${isDarkMode ? 'border-zinc-700' : 'border-gray-200'}`}
                 />
               </div>
             )}
 
-            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+            <div className={`mt-4 grid grid-cols-2 gap-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
               <div>
-                <span className="text-gray-500">Status:</span>
+                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Status:</span>
                 <span className="ml-2 font-medium">{ticket.status.replace(/_/g, ' ')}</span>
               </div>
               <div>
-                <span className="text-gray-500">Created:</span>
-                <span className="ml-2 font-medium">{new Date(ticket.created_at).toLocaleString()}</span>
+                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Created:</span>
+                <span className="ml-2 font-medium">{formatDate(ticket.created_at)}</span>
               </div>
             </div>
           </div>
 
           {/* Visit Request Info */}
           {visitRequest && (
-            <div className="border-t pt-6">
-              <h4 className="font-semibold text-gray-900 mb-3">Factory Visit Request</h4>
-              <div className="bg-orange-50 p-4 rounded-lg space-y-2 text-sm">
+            <div className={`border-t pt-6 ${isDarkMode ? 'border-zinc-800' : 'border-gray-200'}`}>
+              <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                Factory Visit Request
+              </h4>
+              <div className={`p-4 rounded-lg space-y-2 text-sm ${
+                isDarkMode ? 'bg-orange-500/10 border border-orange-500/30' : 'bg-orange-50'
+              }`}>
                 <div className="flex items-center justify-between">
-                  <span>Gym Owner Request:</span>
-                  <span className={visitRequest.requested_by_gym_owner ? 'text-green-600' : 'text-gray-400'}>
+                  <span className={isDarkMode ? 'text-gray-300' : 'text-gray-900'}>Gym Owner Request:</span>
+                  <span className={visitRequest.requested_by_gym_owner 
+                    ? isDarkMode ? 'text-green-400' : 'text-green-600'
+                    : isDarkMode ? 'text-gray-500' : 'text-gray-400'
+                  }>
                     {visitRequest.requested_by_gym_owner ? '✓ Requested' : '✗ Not requested'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Factory Employee Request:</span>
-                  <span className={visitRequest.requested_by_factory_employee ? 'text-green-600' : 'text-gray-400'}>
+                  <span className={isDarkMode ? 'text-gray-300' : 'text-gray-900'}>Factory Employee Request:</span>
+                  <span className={visitRequest.requested_by_factory_employee 
+                    ? isDarkMode ? 'text-green-400' : 'text-green-600'
+                    : isDarkMode ? 'text-gray-500' : 'text-gray-400'
+                  }>
                     {visitRequest.requested_by_factory_employee ? '✓ Requested' : '✗ Not requested'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Approval Status:</span>
+                  <span className={isDarkMode ? 'text-gray-300' : 'text-gray-900'}>Approval Status:</span>
                   <span className={`font-medium ${
-                    visitRequest.approval_status === 'approved' ? 'text-green-600' :
-                    visitRequest.approval_status === 'rejected' ? 'text-red-600' :
-                    'text-yellow-600'
+                    visitRequest.approval === 'approved' 
+                      ? isDarkMode ? 'text-green-400' : 'text-green-600'
+                      : visitRequest.approval === 'rejected' 
+                        ? isDarkMode ? 'text-red-400' : 'text-red-600'
+                        : isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
                   }`}>
-                    {visitRequest.approval_status.toUpperCase()}
+                    {visitRequest.approval.toUpperCase()}
                   </span>
                 </div>
 
+                {canCoRequest && (
+                  <div className={`pt-3 border-t mt-3 ${
+                    isDarkMode ? 'border-orange-500/30' : 'border-orange-200'
+                  }`}>
+                    <button
+                      onClick={handleCoRequest}
+                      disabled={loading}
+                      className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Co-Request Factory Visit</span>
+                    </button>
+                    <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Both gym owner and factory employee must request before approval
+                    </p>
+                  </div>
+                )}
+
                 {canApproveVisit && (
-                  <div className="flex space-x-2 pt-3 border-t mt-3">
+                  <div className={`flex space-x-2 pt-3 border-t mt-3 ${
+                    isDarkMode ? 'border-orange-500/30' : 'border-orange-200'
+                  }`}>
                     <button
                       onClick={handleApproveVisit}
                       disabled={loading}
@@ -286,8 +405,8 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
           )}
 
           {/* Actions */}
-          <div className="border-t pt-6">
-            <h4 className="font-semibold text-gray-900 mb-3">Actions</h4>
+          <div className={`border-t pt-6 ${isDarkMode ? 'border-zinc-800' : 'border-gray-200'}`}>
+            <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Actions</h4>
             <div className="flex flex-wrap gap-2">
               {ticket.status === 'open' && (
                 <button
@@ -320,8 +439,10 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
           </div>
 
           {/* Comments */}
-          <div className="border-t pt-6">
-            <h4 className="font-semibold text-gray-900 mb-3">Activity & Comments</h4>
+          <div className={`border-t pt-6 ${isDarkMode ? 'border-zinc-800' : 'border-gray-200'}`}>
+            <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              Activity & Comments
+            </h4>
             
             {/* Add Comment Form */}
             <form onSubmit={handleAddComment} className="mb-4">
@@ -330,7 +451,7 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Add a comment..."
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className={inputClass}
               />
               <button
                 type="submit"
@@ -344,20 +465,20 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
             {/* Events List */}
             <div className="space-y-3">
               {events.length === 0 ? (
-                <p className="text-gray-500 text-sm">No activity yet</p>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No activity yet</p>
               ) : (
                 events.map((event) => (
-                  <div key={event.id} className="bg-gray-50 p-3 rounded-lg">
+                  <div key={event.id} className={`p-3 rounded-lg ${isDarkMode ? 'bg-zinc-800' : 'bg-gray-50'}`}>
                     <div className="flex items-start justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                         {event.event_type.replace(/_/g, ' ').toUpperCase()}
                       </span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(event.created_at).toLocaleString()}
+                      <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {formatDate(event.created_at)}
                       </span>
                     </div>
                     {event.data && (
-                      <p className="text-sm text-gray-700">
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         {JSON.stringify(event.data)}
                       </p>
                     )}

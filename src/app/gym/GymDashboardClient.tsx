@@ -4,40 +4,42 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Package, Home, Ticket, Users, Plus, LogOut, Menu, X, AlertCircle } from 'lucide-react'
+import { Bell, Dumbbell, Users, Ticket, AlertCircle, LogOut, Menu, X, Plus } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import type { User } from '@supabase/supabase-js'
-import type { FactoryRole, Equipment, Gym, Ticket as TicketType, Notification } from '@/types/database'
+import type { Notification } from '@/types/database'
 import { formatDate } from '@/lib/date-utils'
-import EquipmentManager from '@/components/factory/EquipmentManager'
-import GymManager from '@/components/factory/GymManager'
-import TicketManager from '@/components/factory/TicketManager'
+import GymEquipmentViewer from '@/components/gym/GymEquipmentViewer'
+import GymTicketManager from '@/components/gym/GymTicketManager'
+import GymMemberManager from '@/components/gym/GymMemberManager'
+import QRScannerModal from '@/components/gym/QRScannerModal'
+import GymTicketDetailModal from '@/components/gym/GymTicketDetailModal'
 
 interface InitialData {
-  factory: any
+  gym: any
   equipment: any[]
-  gyms: any[]
   tickets: any[]
+  members: any[]
   notifications: Notification[]
   stats: {
     totalEquipment: number
     activeEquipment: number
-    totalGyms: number
-    activeGyms: number
     openTickets: number
+    resolvedTickets: number
     pendingVisits: number
+    totalMembers: number
   }
 }
 
 interface Props {
   user: User
-  role: FactoryRole
+  role: 'owner' | 'employee'
   initialData: InitialData
 }
 
-type TabType = 'overview' | 'equipment' | 'gyms' | 'tickets'
+type TabType = 'overview' | 'equipment' | 'tickets' | 'members'
 
-export default function FactoryDashboardClient({ user, role, initialData }: Props) {
+export default function GymDashboardClient({ user, role, initialData }: Props) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -45,6 +47,10 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
   const [notifications, setNotifications] = useState<Notification[]>(initialData.notifications)
   const [stats, setStats] = useState(initialData.stats)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [qrScannerOpen, setQrScannerOpen] = useState(false)
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | undefined>()
+  const [selectedTicket, setSelectedTicket] = useState<any | null>(null)
+  const [ticketDetailOpen, setTicketDetailOpen] = useState(false)
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme')
@@ -64,7 +70,7 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
 
   useEffect(() => {
     const notificationChannel = supabase
-      .channel('notifications')
+      .channel('gym-notifications')
       .on(
         'postgres_changes',
         {
@@ -134,6 +140,23 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
     router.push('/auth')
   }
 
+  const handleRefreshData = () => {
+    router.refresh()
+  }
+
+  const handleScanQR = (equipmentId?: string) => {
+    setSelectedEquipmentId(equipmentId)
+    setQrScannerOpen(true)
+  }
+
+  const handleViewTicket = (ticketId: string) => {
+    const ticket = initialData.tickets.find((t: any) => t.id === ticketId)
+    if (ticket) {
+      setSelectedTicket(ticket)
+      setTicketDetailOpen(true)
+    }
+  }
+
   const markNotificationAsRead = async (id: string) => {
     const { error } = await supabase
       .from('notifications')
@@ -194,13 +217,13 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
                 {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
               <h1 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                Factory Dashboard
+                {initialData.gym?.name || 'Gym Dashboard'}
               </h1>
               <span
                 className={`ml-3 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
                   isDarkMode
-                    ? 'bg-blue-500/10 text-blue-200 border border-blue-500/30'
-                    : 'bg-blue-100 text-blue-800'
+                    ? 'bg-green-500/10 text-green-200 border border-green-500/30'
+                    : 'bg-green-100 text-green-800'
                 }`}
               >
                 {role}
@@ -353,7 +376,7 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
                 activeTab === 'overview' ? tabActiveClass : tabInactiveClass
               }`}
             >
-              <Home className="w-4 h-4" />
+              <Dumbbell className="w-4 h-4" />
               <span>Overview</span>
             </button>
 
@@ -363,18 +386,8 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
                 activeTab === 'equipment' ? tabActiveClass : tabInactiveClass
               }`}
             >
-              <Package className="w-4 h-4" />
+              <Dumbbell className="w-4 h-4" />
               <span>Equipment</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('gyms')}
-              className={`${tabBaseClass} ${
-                activeTab === 'gyms' ? tabActiveClass : tabInactiveClass
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Gyms</span>
             </button>
 
             <button
@@ -386,6 +399,18 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
               <Ticket className="w-4 h-4" />
               <span>Tickets</span>
             </button>
+
+            {role === 'owner' && (
+              <button
+                onClick={() => setActiveTab('members')}
+                className={`${tabBaseClass} ${
+                  activeTab === 'members' ? tabActiveClass : tabInactiveClass
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Members</span>
+              </button>
+            )}
           </nav>
         </div>
 
@@ -407,24 +432,7 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
                       {stats.activeEquipment} active
                     </p>
                   </div>
-                  <Package className={`w-12 h-12 opacity-20 ${isDarkMode ? 'text-blue-300' : 'text-blue-500'}`} />
-                </div>
-              </div>
-
-              <div className={cardClass}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Total Gyms
-                    </p>
-                    <p className={`text-3xl font-bold mt-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-                      {stats.totalGyms}
-                    </p>
-                    <p className={`text-xs mt-1 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
-                      {stats.activeGyms} active
-                    </p>
-                  </div>
-                  <Home className={`w-12 h-12 opacity-20 ${isDarkMode ? 'text-purple-300' : 'text-purple-500'}`} />
+                  <Dumbbell className={`w-12 h-12 opacity-20 ${isDarkMode ? 'text-blue-300' : 'text-blue-500'}`} />
                 </div>
               </div>
 
@@ -444,65 +452,28 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
                   <Ticket className={`w-12 h-12 opacity-20 ${isDarkMode ? 'text-orange-300' : 'text-orange-500'}`} />
                 </div>
               </div>
-            </div>
 
-            {/* Quick Actions */}
-            {(role === 'owner' || role === 'employee') && (
               <div className={cardClass}>
-                <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-                  Quick Actions
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                  <button
-                    onClick={() => setActiveTab('equipment')}
-                    className={`flex items-center justify-center space-x-2 p-4 border-2 border-dashed rounded-lg transition-colors ${
-                      isDarkMode
-                        ? 'border-zinc-700 hover:border-blue-500 hover:bg-blue-500/10'
-                        : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
-                    }`}
-                  >
-                    <Plus className={`w-5 h-5 ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`} />
-                    <span className={`font-medium ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>
-                      Add Equipment
-                    </span>
-                  </button>
-
-                  {role === 'owner' && (
-                    <button
-                      onClick={() => setActiveTab('gyms')}
-                      className={`flex items-center justify-center space-x-2 p-4 border-2 border-dashed rounded-lg transition-colors ${
-                        isDarkMode
-                          ? 'border-zinc-700 hover:border-purple-500 hover:bg-purple-500/10'
-                          : 'border-gray-300 hover:border-purple-500 hover:bg-purple-50'
-                      }`}
-                    >
-                      <Plus className={`w-5 h-5 ${isDarkMode ? 'text-purple-300' : 'text-purple-600'}`} />
-                      <span className={`font-medium ${isDarkMode ? 'text-purple-300' : 'text-purple-600'}`}>
-                        Add Gym
-                      </span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => setActiveTab('tickets')}
-                    className={`flex items-center justify-center space-x-2 p-4 border-2 border-dashed rounded-lg transition-colors ${
-                      isDarkMode
-                        ? 'border-zinc-700 hover:border-orange-500 hover:bg-orange-500/10'
-                        : 'border-gray-300 hover:border-orange-500 hover:bg-orange-50'
-                    }`}
-                  >
-                    <Ticket className={`w-5 h-5 ${isDarkMode ? 'text-orange-300' : 'text-orange-600'}`} />
-                    <span className={`font-medium ${isDarkMode ? 'text-orange-300' : 'text-orange-600'}`}>
-                      View All Tickets
-                    </span>
-                  </button>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Resolved Tickets
+                    </p>
+                    <p className={`text-3xl font-bold mt-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                      {stats.resolvedTickets}
+                    </p>
+                    <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      All time
+                    </p>
+                  </div>
+                  <AlertCircle className={`w-12 h-12 opacity-20 ${isDarkMode ? 'text-green-300' : 'text-green-500'}`} />
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Recent Activity */}
+            {/* Recent Tickets */}
             <div className={cardClass}>
-              <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              <h2 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                 Recent Tickets
               </h2>
               {initialData.tickets.length === 0 ? (
@@ -510,10 +481,10 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
                   <AlertCircle
                     className={`w-12 h-12 mx-auto mb-3 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}
                   />
-                  <p>No recent tickets</p>
+                  <p>No tickets yet</p>
                 </div>
               ) : (
-                <div className="space-y-3 mt-4">
+                <div className="space-y-3">
                   {initialData.tickets.slice(0, 5).map((ticket: any) => (
                     <div
                       key={ticket.id}
@@ -528,7 +499,7 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
                           {ticket.equipment?.name || 'Unknown Equipment'}
                         </p>
                         <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {ticket.gyms?.name || 'Unknown Gym'}
+                          {ticket.description}
                         </p>
                         <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                           {formatDate(ticket.created_at)}
@@ -536,14 +507,14 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
                       </div>
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          ticket.status === 'open'
+                          ticket.status === 'open' || ticket.status === 'in_review'
                             ? isDarkMode
-                              ? 'bg-green-500/10 text-green-300 border border-green-500/30'
-                              : 'bg-green-100 text-green-800'
-                            : ticket.status === 'closed'
+                              ? 'bg-blue-500/10 text-blue-300 border border-blue-500/30'
+                              : 'bg-blue-100 text-blue-800'
+                            : ticket.status === 'resolved' || ticket.status === 'closed'
                               ? isDarkMode
-                                ? 'bg-gray-500/10 text-gray-200 border border-gray-500/30'
-                                : 'bg-gray-100 text-gray-800'
+                                ? 'bg-green-500/10 text-green-300 border border-green-500/30'
+                                : 'bg-green-100 text-green-800'
                               : isDarkMode
                                 ? 'bg-yellow-500/10 text-yellow-300 border border-yellow-500/30'
                                 : 'bg-yellow-100 text-yellow-800'
@@ -561,22 +532,77 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
 
         {activeTab === 'equipment' && (
           <div className={cardClass}>
-            <EquipmentManager role={role} userId={user.id} factoryId={initialData.factory?.id || ''} />
-          </div>
-        )}
-
-        {activeTab === 'gyms' && (
-          <div className={cardClass}>
-            <GymManager role={role} userId={user.id} factoryId={initialData.factory?.id || ''} />
+            <h2 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              Equipment List
+            </h2>
+            <GymEquipmentViewer
+              equipment={initialData.equipment}
+              onScanQR={handleScanQR}
+            />
           </div>
         )}
 
         {activeTab === 'tickets' && (
           <div className={cardClass}>
-            <TicketManager role={role} userId={user.id} factoryId={initialData.factory?.id || ''} />
+            <h2 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              All Tickets
+            </h2>
+            <GymTicketManager
+              tickets={initialData.tickets}
+              onViewTicket={handleViewTicket}
+            />
+          </div>
+        )}
+
+        {activeTab === 'members' && role === 'owner' && (
+          <div className={cardClass}>
+            <h2 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              Team Members
+            </h2>
+            <GymMemberManager
+              members={initialData.members}
+              isOwner={role === 'owner'}
+              onInviteMember={() => {
+                toast.success('Invite member feature coming soon!')
+              }}
+            />
           </div>
         )}
       </div>
+
+      {/* QR Scanner Modal */}
+      <QRScannerModal
+        isOpen={qrScannerOpen}
+        onClose={() => {
+          setQrScannerOpen(false)
+          setSelectedEquipmentId(undefined)
+        }}
+        onTicketCreated={handleRefreshData}
+        equipmentId={selectedEquipmentId}
+      />
+
+      {/* Ticket Detail Modal */}
+      {selectedTicket && (
+        <GymTicketDetailModal
+          ticket={selectedTicket}
+          userRole={role}
+          userId={user.id}
+          onClose={() => {
+            setTicketDetailOpen(false)
+            setSelectedTicket(null)
+          }}
+          onUpdate={handleRefreshData}
+        />
+      )}
+
+      {/* Floating Action Button */}
+      <button
+        onClick={() => handleScanQR()}
+        className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all hover:scale-110 z-40"
+        aria-label="Create new ticket"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
     </div>
   )
 }
