@@ -248,7 +248,7 @@ export default function QRScannerModal({ isOpen, onClose, onTicketCreated, equip
                     <ol className="list-decimal list-inside space-y-1 opacity-90">
                       <li>Find the QR code on the equipment</li>
                       <li>Enter the code shown below the QR</li>
-                      <li>Or scan with your phone's camera and copy the code</li>
+                      <li>Or scan with your phone&apos;s camera and copy the code</li>
                     </ol>
                   </div>
                 </div>
