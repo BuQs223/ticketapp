@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { X, CheckCircle, AlertTriangle, MessageSquare, Wrench, Factory } from 'lucide-react'
+import { X, MessageSquare, Image as ImageIcon, Factory, Wrench, CheckCircle, CheckCircle2, ZoomIn } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '@/lib/date-utils'
 import type { TicketStatus } from '@/types/database'
+import ImageLightbox from '@/components/ImageLightbox'
+import TicketConfirmationModal from '@/components/TicketConfirmationModal'
 
 interface Props {
   ticket: any
@@ -23,6 +25,10 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
   const [loading, setLoading] = useState(false)
   const [showResolveForm, setShowResolveForm] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [selectedImage, setSelectedImage] = useState('')
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false)
+  const [confirmations, setConfirmations] = useState<any[]>([])
 
   useEffect(() => {
     const checkTheme = () => {
@@ -41,6 +47,7 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
   useEffect(() => {
     fetchTicketEvents()
     fetchVisitRequest()
+    fetchConfirmations()
   }, [ticket.id])
 
   const fetchTicketEvents = async () => {
@@ -61,6 +68,16 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
       .maybeSingle()
 
     setVisitRequest(data)
+  }
+
+  const fetchConfirmations = async () => {
+    const { data } = await supabase
+      .from('ticket_confirmations')
+      .select('*')
+      .eq('ticket_id', ticket.id)
+      .order('created_at', { ascending: false })
+
+    setConfirmations(data || [])
   }
 
   const handleAddComment = async (e: React.FormEvent) => {
@@ -134,8 +151,7 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
         .update({
           status: 'resolved',
           resolution_notes: resolutionNotes.trim(),
-          closed_at: new Date().toISOString(),
-          closed_by: userId,
+          needs_confirmation: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', ticket.id)
@@ -154,9 +170,10 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
         }
       })
 
-      toast.success('Ticket resolved successfully!')
+      toast.success('Equipment fixed! Please create confirmation report with photo.')
+      setShowResolveForm(false)
+      setResolutionNotes('')
       onUpdate()
-      onClose()
     } catch (error: any) {
       toast.error(error.message || 'Failed to resolve ticket')
       console.error(error)
@@ -236,13 +253,13 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
                              ticket.status === 'factory_visit_approved'
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto transition-colors ${
-        isDarkMode ? 'bg-zinc-900 text-gray-100' : 'bg-white text-gray-900'
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+      <div className={`rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto transition-all duration-200 ${
+        isDarkMode ? 'bg-zinc-900 text-gray-100 ring-1 ring-zinc-800' : 'bg-white text-gray-900 ring-1 ring-gray-200'
       }`}>
         {/* Header */}
-        <div className={`sticky top-0 border-b px-6 py-4 flex justify-between items-center transition-colors ${
-          isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'
+        <div className={`sticky top-0 border-b px-6 py-4 flex justify-between items-center backdrop-blur-sm transition-colors ${
+          isDarkMode ? 'bg-zinc-900/95 border-zinc-800' : 'bg-white/95 border-gray-200'
         }`}>
           <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
             Ticket Details
@@ -305,11 +322,25 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
                 <p className={`text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Photo:
                 </p>
-                <img 
-                  src={ticket.photo_url} 
-                  alt="Issue" 
-                  className={`max-w-md rounded-lg border ${isDarkMode ? 'border-zinc-700' : 'border-gray-200'}`}
-                />
+                <div className="relative group max-w-md">
+                  <img 
+                    src={ticket.photo_url} 
+                    alt="Issue" 
+                    onClick={() => setLightboxOpen(true)}
+                    className={`max-w-full rounded-lg border cursor-pointer transition-all ${
+                      isDarkMode 
+                        ? 'border-zinc-700 hover:border-zinc-600' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    } hover:shadow-lg`}
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer"
+                    onClick={() => setLightboxOpen(true)}>
+                    <div className="bg-white/90 px-4 py-2 rounded-lg flex items-center space-x-2">
+                      <ImageIcon className="w-5 h-5 text-gray-700" />
+                      <span className="text-gray-700 font-medium">Click to enlarge</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -404,6 +435,27 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
                     Mark as Resolved
                   </button>
                 )}
+                
+                {/* Confirmation button for resolved tickets */}
+                {userRole === 'owner' &&
+                  (ticket.status === 'resolved' || ticket.status === 'factory_visit_approved') &&
+                  !ticket.confirmed_by_gym && (
+                    <button
+                      onClick={() => setShowConfirmationModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Confirm Resolution
+                    </button>
+                  )}
+                
+                {/* Show confirmation status */}
+                {ticket.confirmed_by_gym && (
+                  <div className="flex items-center gap-2 text-green-500 font-medium">
+                    <CheckCircle2 className="w-5 h-5" />
+                    Gym Confirmed ✓
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -450,6 +502,69 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* Confirmation Section */}
+          {ticket.status === 'resolved' && confirmations.length > 0 && (
+            <div className={`border-t pt-6 mb-6 ${isDarkMode ? 'border-zinc-800' : 'border-gray-200'}`}>
+              <h4 className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                <CheckCircle2 className="w-5 h-5" />
+                Resolution Confirmations
+              </h4>
+              <div className="space-y-4">
+                {confirmations.map((confirmation) => (
+                  <div
+                    key={confirmation.id}
+                    className={`p-4 rounded-lg ${
+                      isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            confirmation.confirmer_role === 'gym_owner'
+                              ? isDarkMode
+                                ? 'bg-blue-900/50 text-blue-300'
+                                : 'bg-blue-100 text-blue-800'
+                              : isDarkMode
+                              ? 'bg-purple-900/50 text-purple-300'
+                              : 'bg-purple-100 text-purple-800'
+                          }`}
+                        >
+                          {confirmation.confirmer_role === 'gym_owner' ? 'Gym Owner' : 'Factory Staff'}
+                        </span>
+                        <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {new Date(confirmation.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    </div>
+                    <p className={`mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {confirmation.confirmation_notes}
+                    </p>
+                    {confirmation.confirmation_photo_url && (
+                      <div
+                        className="relative w-full h-48 rounded-lg overflow-hidden cursor-pointer group"
+                        onClick={() => {
+                          setSelectedImage(confirmation.confirmation_photo_url)
+                          setLightboxOpen(true)
+                        }}
+                      >
+                        <img
+                          src={confirmation.confirmation_photo_url}
+                          alt="Confirmation"
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+                          <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -510,6 +625,32 @@ export default function GymTicketDetailModal({ ticket, userRole, userId, onClose
           </div>
         </div>
       </div>
+
+      {/* Image Lightbox */}
+      {lightboxOpen && (
+        <ImageLightbox 
+          imageUrl={selectedImage || ticket.photo_url} 
+          onClose={() => {
+            setLightboxOpen(false)
+            setSelectedImage('')
+          }} 
+        />
+      )}
+      
+      {/* Confirmation Modal */}
+      {showConfirmationModal && (
+        <TicketConfirmationModal
+          ticketId={ticket.id}
+          userId={userId}
+          onClose={() => setShowConfirmationModal(false)}
+          onConfirmed={() => {
+            setShowConfirmationModal(false)
+            fetchConfirmations()
+            onUpdate()
+          }}
+          role="gym_owner"
+        />
+      )}
     </div>
   )
 }

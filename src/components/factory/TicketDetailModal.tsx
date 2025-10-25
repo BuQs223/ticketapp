@@ -6,6 +6,8 @@ import { X, CheckCircle, XCircle, MessageSquare, Image as ImageIcon } from 'luci
 import toast from 'react-hot-toast'
 import { formatDate } from '@/lib/date-utils'
 import type { TicketStatus } from '@/types/database'
+import ImageLightbox from '@/components/ImageLightbox'
+import TicketConfirmationModal from '@/components/TicketConfirmationModal'
 
 interface Props {
   ticket: any
@@ -21,6 +23,9 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
   const [comment, setComment] = useState('')
   const [loading, setLoading] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false)
+  const [confirmations, setConfirmations] = useState<any[]>([])
 
   useEffect(() => {
     const checkTheme = () => {
@@ -39,6 +44,7 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
   useEffect(() => {
     fetchTicketEvents()
     fetchVisitRequest()
+    fetchConfirmations()
   }, [ticket.id])
 
   const fetchTicketEvents = async () => {
@@ -62,6 +68,16 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
       console.error('Error fetching visit request:', error)
     }
     setVisitRequest(data)
+  }
+
+  const fetchConfirmations = async () => {
+    const { data } = await supabase
+      .from('ticket_confirmations')
+      .select('*')
+      .eq('ticket_id', ticket.id)
+      .order('created_at', { ascending: false })
+
+    setConfirmations(data || [])
   }
 
   const handleStatusUpdate = async (newStatus: TicketStatus) => {
@@ -90,6 +106,43 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
       toast.success('Ticket status updated')
       onUpdate()
       onClose()
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update ticket')
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMarkAsResolved = async () => {
+    setLoading(true)
+    
+    try {
+      const { error } = await supabase
+        .from('tickets')
+        .update({
+          status: 'resolved',
+          needs_confirmation: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', ticket.id)
+      
+      if (error) throw error
+      
+      await supabase.from('ticket_events').insert({
+        ticket_id: ticket.id,
+        actor_user_id: userId,
+        event_type: 'status_change',
+        data: { 
+          from: ticket.status, 
+          to: 'resolved',
+          resolution_type: 'factory_visit',
+          note: 'Factory completed repair work'
+        }
+      })
+      
+      toast.success('Equipment repair completed! Now both parties must confirm with photo reports.')
+      onUpdate()
     } catch (error: any) {
       toast.error(error.message || 'Failed to update ticket')
       console.error(error)
@@ -244,13 +297,13 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
   } focus:outline-none focus:ring-2`
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto transition-colors ${
-        isDarkMode ? 'bg-zinc-900 text-gray-100' : 'bg-white text-gray-900'
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+      <div className={`rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto transition-all duration-200 ${
+        isDarkMode ? 'bg-zinc-900 text-gray-100 ring-1 ring-zinc-800' : 'bg-white text-gray-900 ring-1 ring-gray-200'
       }`}>
         {/* Header */}
-        <div className={`sticky top-0 border-b px-6 py-4 flex justify-between items-center transition-colors ${
-          isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'
+        <div className={`sticky top-0 border-b px-6 py-4 flex justify-between items-center backdrop-blur-sm transition-colors ${
+          isDarkMode ? 'bg-zinc-900/95 border-zinc-800' : 'bg-white/95 border-gray-200'
         }`}>
           <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
             Ticket Details
@@ -300,11 +353,25 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
                 <p className={`text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Photo:
                 </p>
-                <img 
-                  src={ticket.photo_url} 
-                  alt="Ticket" 
-                  className={`max-w-md rounded-lg border ${isDarkMode ? 'border-zinc-700' : 'border-gray-200'}`}
-                />
+                <div className="relative group max-w-md">
+                  <img 
+                    src={ticket.photo_url} 
+                    alt="Ticket" 
+                    onClick={() => setLightboxOpen(true)}
+                    className={`max-w-full rounded-lg border cursor-pointer transition-all ${
+                      isDarkMode 
+                        ? 'border-zinc-700 hover:border-zinc-600' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    } hover:shadow-lg`}
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer"
+                    onClick={() => setLightboxOpen(true)}>
+                    <div className="bg-white/90 px-4 py-2 rounded-lg flex items-center space-x-2">
+                      <ImageIcon className="w-5 h-5 text-gray-700" />
+                      <span className="text-gray-700 font-medium">Click to enlarge</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -417,25 +484,86 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
                   Mark as In Review
                 </button>
               )}
-              {ticket.status === 'factory_visit_approved' && (
+              
+              {/* Factory marks work as completed */}
+              {ticket.status === 'factory_visit_approved' && 
+               !confirmations.some(c => ['factory_employee', 'factory_approver', 'factory_owner'].includes(c.confirmer_role)) && (
                 <button
-                  onClick={() => handleStatusUpdate('resolved')}
+                  onClick={handleMarkAsResolved}
                   disabled={loading}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                 >
                   Mark as Resolved
                 </button>
               )}
-              {ticket.status === 'resolved' && (
+              
+              {/* Factory creates confirmation report */}
+              {ticket.status === 'resolved' && !ticket.confirmed_at && (
                 <button
-                  onClick={() => handleStatusUpdate('closed')}
-                  disabled={loading}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  onClick={() => setShowConfirmationModal(true)}
+                  disabled={loading || confirmations.some(c => ['factory_employee', 'factory_approver', 'factory_owner'].includes(c.confirmer_role))}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
                 >
-                  Close Ticket
+                  {confirmations.some(c => ['factory_employee', 'factory_approver', 'factory_owner'].includes(c.confirmer_role))
+                    ? 'Factory Confirmed ✓'
+                    : 'Create Report (Photo Required)'
+                  }
                 </button>
               )}
+              
+              {ticket.confirmed_at && (
+                <div className={`px-4 py-2 rounded-lg ${
+                  isDarkMode ? 'bg-green-500/10 text-green-300 border border-green-500/30' : 'bg-green-100 text-green-800'
+                }`}>
+                  ✓ Fully Confirmed by Both Parties
+                </div>
+              )}
             </div>
+
+            {/* Confirmation Status */}
+            {confirmations.length > 0 && (
+              <div className={`mt-4 p-4 rounded-lg border ${
+                isDarkMode ? 'bg-zinc-800 border-zinc-700' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                  Resolution Confirmations
+                </h4>
+                <div className="space-y-3">
+                  {confirmations.map((conf) => (
+                    <div
+                      key={conf.id}
+                      className={`p-3 rounded-lg ${
+                        isDarkMode ? 'bg-zinc-900' : 'bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`font-medium ${
+                          conf.confirmer_role === 'gym_owner' 
+                            ? 'text-blue-400' 
+                            : 'text-green-400'
+                        }`}>
+                          {conf.confirmer_role === 'gym_owner' ? '🏋️ Gym Owner' : '🏭 Factory Staff'}
+                        </span>
+                        <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {formatDate(conf.created_at)}
+                        </span>
+                      </div>
+                      <p className={`text-sm mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {conf.confirmation_notes}
+                      </p>
+                      {conf.confirmation_photo_url && (
+                        <img 
+                          src={conf.confirmation_photo_url} 
+                          alt="Confirmation" 
+                          onClick={() => setLightboxOpen(true)}
+                          className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Comments */}
@@ -489,6 +617,28 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
           </div>
         </div>
       </div>
+
+      {/* Image Lightbox */}
+      {lightboxOpen && ticket.photo_url && (
+        <ImageLightbox 
+          imageUrl={ticket.photo_url} 
+          onClose={() => setLightboxOpen(false)} 
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmationModal && (
+        <TicketConfirmationModal
+          ticketId={ticket.id}
+          role={role === 'owner' ? 'factory_owner' : role === 'approver' ? 'factory_approver' : 'factory_employee'}
+          userId={userId}
+          onClose={() => setShowConfirmationModal(false)}
+          onConfirmed={() => {
+            fetchConfirmations()
+            onUpdate()
+          }}
+        />
+      )}
     </div>
   )
 }

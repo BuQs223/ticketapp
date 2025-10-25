@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Plus, Edit2, Trash2, QrCode, Search, Filter } from 'lucide-react'
+import { Plus, Edit2, Trash2, QrCode, Search, Filter, History } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { Equipment, EquipmentType, MuscleGroup, EquipmentStatus } from '@/types/database'
 import EquipmentFormModal from './EquipmentFormModal'
 import QRCodeModal from './QRCodeModal'
+import EquipmentHistoryModal from '@/components/EquipmentHistoryModal'
 
 interface Props {
   role: 'owner' | 'approver' | 'employee'
@@ -19,11 +20,18 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<EquipmentStatus | 'all'>('all')
+  const [gymFilter, setGymFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<EquipmentType | 'all'>('all')
+  const [muscleFilter, setMuscleFilter] = useState<MuscleGroup | 'all'>('all')
   const [selectedEquipment, setSelectedEquipment] = useState<any | null>(null)
   const [showFormModal, setShowFormModal] = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [qrEquipment, setQrEquipment] = useState<any | null>(null)
+  const [historyEquipment, setHistoryEquipment] = useState<any | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 15
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme')
@@ -124,9 +132,32 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
       item.serial_number.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesStatus = statusFilter === 'all' || item.status === statusFilter
+    const matchesGym = gymFilter === 'all' || item.gym_id === gymFilter
+    const matchesType = typeFilter === 'all' || item.type === typeFilter
+    const matchesMuscle = muscleFilter === 'all' || item.muscle_group === muscleFilter
 
-    return matchesSearch && matchesStatus
+    return matchesSearch && matchesStatus && matchesGym && matchesType && matchesMuscle
   })
+
+  // Pagination
+  const totalPages = Math.ceil(filteredEquipment.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedEquipment = filteredEquipment.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter, gymFilter, typeFilter, muscleFilter])
+
+  // Get unique gyms for filter
+  const uniqueGyms = useMemo(() => {
+    const gyms = equipment
+      .filter(item => item.gyms)
+      .map(item => ({ id: item.gym_id, name: item.gyms.name }))
+    const unique = Array.from(new Map(gyms.map(g => [g.id, g])).values())
+    return unique
+  }, [equipment])
 
   const inputClass = useMemo(() => 
     `w-full pl-10 pr-4 py-2 border rounded-lg transition-colors ${
@@ -152,14 +183,14 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div className="relative">
           <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
             isDarkMode ? 'text-gray-500' : 'text-gray-400'
           }`} />
           <input
             type="text"
-            placeholder="Search by name or serial number..."
+            placeholder="Search by name or serial..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className={inputClass}
@@ -181,6 +212,65 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
             <option value="retired">Retired</option>
           </select>
         </div>
+
+        <div className="relative">
+          <Filter className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
+            isDarkMode ? 'text-gray-500' : 'text-gray-400'
+          }`} />
+          <select
+            value={gymFilter}
+            onChange={(e) => setGymFilter(e.target.value)}
+            className={`${inputClass} appearance-none`}
+          >
+            <option value="all">All Gyms</option>
+            <option value="unassigned">Unassigned</option>
+            {uniqueGyms.map((gym) => (
+              <option key={gym.id} value={gym.id}>
+                {gym.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="relative">
+          <Filter className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
+            isDarkMode ? 'text-gray-500' : 'text-gray-400'
+          }`} />
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as EquipmentType | 'all')}
+            className={`${inputClass} appearance-none`}
+          >
+            <option value="all">All Types</option>
+            <option value="treadmill">Treadmill</option>
+            <option value="bike">Bike</option>
+            <option value="rower">Rower</option>
+            <option value="weights">Weights</option>
+            <option value="machine">Machine</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div className="relative">
+          <Filter className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
+            isDarkMode ? 'text-gray-500' : 'text-gray-400'
+          }`} />
+          <select
+            value={muscleFilter}
+            onChange={(e) => setMuscleFilter(e.target.value as MuscleGroup | 'all')}
+            className={`${inputClass} appearance-none`}
+          >
+            <option value="all">All Muscles</option>
+            <option value="chest">Chest</option>
+            <option value="back">Back</option>
+            <option value="legs">Legs</option>
+            <option value="shoulders">Shoulders</option>
+            <option value="arms">Arms</option>
+            <option value="core">Core</option>
+            <option value="full_body">Full Body</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
       </div>
 
       {/* Equipment List */}
@@ -198,7 +288,7 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredEquipment.map((item) => (
+          {paginatedEquipment.map((item) => (
             <div
               key={item.id}
               className={`border rounded-lg p-4 hover:shadow-md transition-all ${
@@ -258,6 +348,20 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
 
               <div className="flex space-x-2">
                 <button
+                  onClick={() => {
+                    setHistoryEquipment(item)
+                    setShowHistoryModal(true)
+                  }}
+                  className={`flex-1 flex items-center justify-center space-x-1 px-3 py-2 rounded-lg transition-colors text-sm ${
+                    isDarkMode
+                      ? 'bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 border border-indigo-500/30'
+                      : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                  }`}
+                >
+                  <History className="w-4 h-4" />
+                  <span>History</span>
+                </button>
+                <button
                   onClick={() => handleShowQR(item)}
                   className={`flex-1 flex items-center justify-center space-x-1 px-3 py-2 rounded-lg transition-colors text-sm ${
                     isDarkMode
@@ -297,6 +401,90 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
         </div>
       )}
 
+      {/* Pagination Controls */}
+      {!loading && filteredEquipment.length > 0 && (
+        <div className={`mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-lg ${
+          isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-50'
+        }`}>
+          <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredEquipment.length)} of {filteredEquipment.length} equipment
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                isDarkMode
+                  ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600 disabled:hover:bg-zinc-700'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:hover:bg-white'
+              }`}
+            >
+              Previous
+            </button>
+            
+            {/* Page Numbers */}
+            <div className="hidden sm:flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                // Show first page, last page, current page, and pages around current
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-10 h-10 rounded-lg transition-colors ${
+                        currentPage === page
+                          ? isDarkMode
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-blue-500 text-white'
+                          : isDarkMode
+                          ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600'
+                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                } else if (
+                  page === currentPage - 2 ||
+                  page === currentPage + 2
+                ) {
+                  return (
+                    <span key={page} className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>
+                      ...
+                    </span>
+                  )
+                }
+                return null
+              })}
+            </div>
+
+            {/* Mobile: Just show current page */}
+            <div className={`sm:hidden px-3 py-2 rounded-lg ${
+              isDarkMode ? 'bg-zinc-700 text-gray-300' : 'bg-white border border-gray-300 text-gray-700'
+            }`}>
+              {currentPage} / {totalPages}
+            </div>
+            
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                isDarkMode
+                  ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600 disabled:hover:bg-zinc-700'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:hover:bg-white'
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
       {showFormModal && (
         <EquipmentFormModal
@@ -321,6 +509,17 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
           onClose={() => {
             setShowQRModal(false)
             setQrEquipment(null)
+          }}
+        />
+      )}
+
+      {showHistoryModal && historyEquipment && (
+        <EquipmentHistoryModal
+          equipmentId={historyEquipment.id}
+          equipmentName={historyEquipment.name}
+          onClose={() => {
+            setShowHistoryModal(false)
+            setHistoryEquipment(null)
           }}
         />
       )}

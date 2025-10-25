@@ -21,6 +21,8 @@ export default function TicketManager({ role, userId, factoryId }: Props) {
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 15
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme')
@@ -106,6 +108,17 @@ export default function TicketManager({ role, userId, factoryId }: Props) {
 
     return matchesSearch && matchesStatus
   })
+
+  // Pagination
+  const totalPages = Math.ceil(filteredTickets.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedTickets = filteredTickets.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter])
 
   const getStatusColor = (status: TicketStatus) => {
     const baseClasses = 'px-2 py-1 rounded-full text-xs font-medium'
@@ -305,6 +318,70 @@ export default function TicketManager({ role, userId, factoryId }: Props) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+        
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div className={`mt-6 flex items-center justify-between border-t pt-4 ${
+          isDarkMode ? 'border-zinc-800' : 'border-gray-200'
+        }`}>
+          <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredTickets.length)} of {filteredTickets.length} tickets
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentPage === 1
+                  ? isDarkMode
+                    ? 'bg-zinc-800 text-gray-600 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : isDarkMode
+                  ? 'bg-zinc-800 text-gray-200 hover:bg-zinc-700'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Previous
+            </button>
+            
+            <div className="flex gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                    currentPage === page
+                      ? isDarkMode
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-blue-600 text-white'
+                      : isDarkMode
+                      ? 'bg-zinc-800 text-gray-300 hover:bg-zinc-700'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentPage === totalPages
+                  ? isDarkMode
+                    ? 'bg-zinc-800 text-gray-600 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : isDarkMode
+                  ? 'bg-zinc-800 text-gray-200 hover:bg-zinc-700'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 

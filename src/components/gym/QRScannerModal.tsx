@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Camera, Upload, AlertCircle } from 'lucide-react'
+import { X, Camera, Upload, AlertCircle, Edit3 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
+import ImageEditor from '@/components/ImageEditor'
 
 interface Equipment {
   id: string
@@ -31,6 +32,7 @@ export default function QRScannerModal({ isOpen, onClose, onTicketCreated, equip
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [showImageEditor, setShowImageEditor] = useState(false)
 
   useEffect(() => {
     const checkTheme = () => {
@@ -144,6 +146,25 @@ export default function QRScannerModal({ isOpen, onClose, onTicketCreated, equip
       .getPublicUrl(filePath)
 
     return publicUrl
+  }
+
+  const handleEditImage = () => {
+    if (photoPreview) {
+      setShowImageEditor(true)
+    }
+  }
+
+  const handleSaveEditedImage = (editedBlob: Blob) => {
+    const file = new File([editedBlob], 'edited-photo.jpg', { type: 'image/jpeg' })
+    setPhotoFile(file)
+    
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result as string)
+      setShowImageEditor(false)
+      toast.success('Image edited successfully!')
+    }
+    reader.readAsDataURL(file)
   }
 
   const handleCreateTicket = async () => {
@@ -321,19 +342,35 @@ export default function QRScannerModal({ isOpen, onClose, onTicketCreated, equip
                   Photo (optional)
                 </label>
                 {photoPreview ? (
-                  <div className="relative">
+                  <div className="relative space-y-2">
                     <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
-                    <button
-                      onClick={() => {
-                        setPhotoFile(null)
-                        setPhotoPreview(null)
-                      }}
-                      className={`absolute top-2 right-2 p-2 rounded-lg shadow-lg ${
-                        isDarkMode ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-white hover:bg-gray-100'
-                      }`}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={handleEditImage}
+                        className={`flex-1 flex items-center justify-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                          isDarkMode
+                            ? 'bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 border border-blue-500/30'
+                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        }`}
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        <span>Edit Image</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPhotoFile(null)
+                          setPhotoPreview(null)
+                        }}
+                        className={`flex items-center justify-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                          isDarkMode
+                            ? 'bg-red-500/10 text-red-300 hover:bg-red-500/20 border border-red-500/30'
+                            : 'bg-red-100 text-red-700 hover:bg-red-200'
+                        }`}
+                      >
+                        <X className="w-4 h-4" />
+                        <span>Remove</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <label
@@ -401,6 +438,15 @@ export default function QRScannerModal({ isOpen, onClose, onTicketCreated, equip
           )}
         </div>
       </div>
+
+      {/* Image Editor Modal */}
+      {showImageEditor && photoPreview && (
+        <ImageEditor
+          imageUrl={photoPreview}
+          onSave={handleSaveEditedImage}
+          onCancel={() => setShowImageEditor(false)}
+        />
+      )}
     </div>
   )
 }

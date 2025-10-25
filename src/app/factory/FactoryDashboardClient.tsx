@@ -12,6 +12,7 @@ import { formatDate } from '@/lib/date-utils'
 import EquipmentManager from '@/components/factory/EquipmentManager'
 import GymManager from '@/components/factory/GymManager'
 import TicketManager from '@/components/factory/TicketManager'
+import TicketDetailModal from '@/components/factory/TicketDetailModal'
 
 interface InitialData {
   factory: any
@@ -45,6 +46,8 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
   const [notifications, setNotifications] = useState<Notification[]>(initialData.notifications)
   const [stats, setStats] = useState(initialData.stats)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [selectedTicket, setSelectedTicket] = useState<any>(null)
+  const [ticketDetailOpen, setTicketDetailOpen] = useState(false)
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme')
@@ -145,6 +148,32 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
         prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
       )
     }
+  }
+
+  const handleViewTicket = async (ticketId: string) => {
+    const { data, error } = await supabase
+      .from('tickets')
+      .select(`
+        *,
+        equipment:equipment_id(*),
+        gyms:gym_id(*),
+        factory_visit_requests(*)
+      `)
+      .eq('id', ticketId)
+      .single()
+
+    if (error) {
+      toast.error('Failed to load ticket details')
+      return
+    }
+
+    setSelectedTicket(data)
+    setTicketDetailOpen(true)
+  }
+
+  const handleRefreshData = async () => {
+    // Refresh stats and data after ticket update
+    window.location.reload()
   }
 
   const unreadCount = notifications.filter((n) => !n.read_at).length
@@ -517,10 +546,11 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
                   {initialData.tickets.slice(0, 5).map((ticket: any) => (
                     <div
                       key={ticket.id}
-                      className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
+                      onClick={() => handleViewTicket(ticket.id)}
+                      className={`flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer ${
                         isDarkMode
-                          ? 'border-zinc-800 hover:bg-zinc-800/60'
-                          : 'border-gray-200 hover:bg-gray-50'
+                          ? 'border-zinc-800 hover:bg-zinc-800/60 hover:border-zinc-700'
+                          : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
                       }`}
                     >
                       <div>
@@ -577,6 +607,20 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
           </div>
         )}
       </div>
+
+      {/* Ticket Detail Modal */}
+      {selectedTicket && ticketDetailOpen && (
+        <TicketDetailModal
+          ticket={selectedTicket}
+          role={role}
+          userId={user.id}
+          onClose={() => {
+            setTicketDetailOpen(false)
+            setSelectedTicket(null)
+          }}
+          onUpdate={handleRefreshData}
+        />
+      )}
     </div>
   )
 }

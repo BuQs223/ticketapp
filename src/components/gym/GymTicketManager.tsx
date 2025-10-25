@@ -29,6 +29,8 @@ export default function GymTicketManager({ tickets, onViewTicket }: Props) {
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all')
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all')
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 15
 
   useEffect(() => {
     const checkTheme = () => {
@@ -57,6 +59,17 @@ export default function GymTicketManager({ tickets, onViewTicket }: Props) {
       return matchesSearch && matchesStatus && matchesPriority
     })
   }, [tickets, searchTerm, statusFilter, priorityFilter])
+
+  // Pagination
+  const totalPages = Math.ceil(filteredTickets.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedTickets = filteredTickets.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter, priorityFilter])
 
   const inputClass = useMemo(
     () =>
@@ -208,7 +221,7 @@ export default function GymTicketManager({ tickets, onViewTicket }: Props) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredTickets.map((ticket) => (
+          {paginatedTickets.map((ticket) => (
             <div
               key={ticket.id}
               onClick={() => onViewTicket(ticket.id)}
@@ -252,6 +265,89 @@ export default function GymTicketManager({ tickets, onViewTicket }: Props) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {filteredTickets.length > 0 && (
+        <div className={`mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-lg ${
+          isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-50'
+        }`}>
+          <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredTickets.length)} of {filteredTickets.length} tickets
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                isDarkMode
+                  ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600 disabled:hover:bg-zinc-700'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:hover:bg-white'
+              }`}
+            >
+              Previous
+            </button>
+            
+            {/* Page Numbers */}
+            <div className="hidden sm:flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-10 h-10 rounded-lg transition-colors ${
+                        currentPage === page
+                          ? isDarkMode
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-blue-500 text-white'
+                          : isDarkMode
+                          ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600'
+                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                } else if (
+                  page === currentPage - 2 ||
+                  page === currentPage + 2
+                ) {
+                  return (
+                    <span key={page} className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>
+                      ...
+                    </span>
+                  )
+                }
+                return null
+              })}
+            </div>
+
+            {/* Mobile: Just show current page */}
+            <div className={`sm:hidden px-3 py-2 rounded-lg ${
+              isDarkMode ? 'bg-zinc-700 text-gray-300' : 'bg-white border border-gray-300 text-gray-700'
+            }`}>
+              {currentPage} / {totalPages}
+            </div>
+            
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                isDarkMode
+                  ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600 disabled:hover:bg-zinc-700'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:hover:bg-white'
+              }`}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

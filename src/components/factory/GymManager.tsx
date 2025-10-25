@@ -18,6 +18,8 @@ export default function GymManager({ role, userId, factoryId }: Props) {
   const [selectedGym, setSelectedGym] = useState<any | null>(null)
   const [showFormModal, setShowFormModal] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 15
   const canManageGyms = role === 'owner' || role === 'approver'
 
   useEffect(() => {
@@ -132,6 +134,12 @@ export default function GymManager({ role, userId, factoryId }: Props) {
     setShowFormModal(true)
   }
 
+  // Pagination
+  const totalPages = Math.ceil(gyms.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedGyms = gyms.slice(startIndex, endIndex)
+
   return (
     <div>
       {/* Header */}
@@ -165,7 +173,7 @@ export default function GymManager({ role, userId, factoryId }: Props) {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {gyms.map((gym) => (
+          {paginatedGyms.map((gym) => (
             <div
               key={gym.id}
               className={`border rounded-lg p-6 hover:shadow-md transition-all ${
@@ -182,6 +190,12 @@ export default function GymManager({ role, userId, factoryId }: Props) {
                   <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     Created {new Date(gym.created_at).toLocaleDateString()}
                   </p>
+                  <div className={`mt-2 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <p className="font-medium">Owner ID:</p>
+                    <p className={`text-xs font-mono ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {gym.owner_user_id}
+                    </p>
+                  </div>
                 </div>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -268,6 +282,89 @@ export default function GymManager({ role, userId, factoryId }: Props) {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && gyms.length > 0 && (
+        <div className={`mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-lg ${
+          isDarkMode ? 'bg-zinc-800/50' : 'bg-gray-50'
+        }`}>
+          <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Showing {startIndex + 1} to {Math.min(endIndex, gyms.length)} of {gyms.length} gyms
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                isDarkMode
+                  ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600 disabled:hover:bg-zinc-700'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:hover:bg-white'
+              }`}
+            >
+              Previous
+            </button>
+            
+            {/* Page Numbers */}
+            <div className="hidden sm:flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-10 h-10 rounded-lg transition-colors ${
+                        currentPage === page
+                          ? isDarkMode
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-purple-500 text-white'
+                          : isDarkMode
+                          ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600'
+                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                } else if (
+                  page === currentPage - 2 ||
+                  page === currentPage + 2
+                ) {
+                  return (
+                    <span key={page} className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>
+                      ...
+                    </span>
+                  )
+                }
+                return null
+              })}
+            </div>
+
+            {/* Mobile: Just show current page */}
+            <div className={`sm:hidden px-3 py-2 rounded-lg ${
+              isDarkMode ? 'bg-zinc-700 text-gray-300' : 'bg-white border border-gray-300 text-gray-700'
+            }`}>
+              {currentPage} / {totalPages}
+            </div>
+            
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                isDarkMode
+                  ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600 disabled:hover:bg-zinc-700'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:hover:bg-white'
+              }`}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 
