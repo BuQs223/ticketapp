@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Package, Home, Ticket, Users, Plus, LogOut, Menu, X, AlertCircle } from 'lucide-react'
+import { Bell, Package, Home, Ticket, Users, Plus, LogOut, Menu, X, AlertCircle, UserCircle, Shield, UserCog } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import type { User } from '@supabase/supabase-js'
 import type { FactoryRole, Equipment, Gym, Ticket as TicketType, Notification } from '@/types/database'
@@ -12,6 +12,8 @@ import { formatDate } from '@/lib/date-utils'
 import EquipmentManager from '@/components/factory/EquipmentManager'
 import GymManager from '@/components/factory/GymManager'
 import TicketManager from '@/components/factory/TicketManager'
+import FactoryMembersManager from '@/components/factory/FactoryMembersManager'
+import UserManagement from '@/components/factory/UserManagement'
 import TicketDetailModal from '@/components/factory/TicketDetailModal'
 
 interface InitialData {
@@ -36,7 +38,7 @@ interface Props {
   initialData: InitialData
 }
 
-type TabType = 'overview' | 'equipment' | 'gyms' | 'tickets'
+type TabType = 'overview' | 'equipment' | 'gyms' | 'tickets' | 'members' | 'users'
 
 export default function FactoryDashboardClient({ user, role, initialData }: Props) {
   const router = useRouter()
@@ -357,6 +359,18 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
               </span>
 
               <button
+                onClick={() => router.push('/profile')}
+                className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isDarkMode
+                    ? 'bg-zinc-800 text-gray-300 hover:bg-zinc-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <UserCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">Profile</span>
+              </button>
+
+              <button
                 onClick={handleSignOut}
                 className="flex items-center space-x-2 bg-red-600 text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
               >
@@ -414,6 +428,26 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
             >
               <Ticket className="w-4 h-4" />
               <span>Tickets</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('members')}
+              className={`${tabBaseClass} ${
+                activeTab === 'members' ? tabActiveClass : tabInactiveClass
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              <span>Members</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`${tabBaseClass} ${
+                activeTab === 'users' ? tabActiveClass : tabInactiveClass
+              }`}
+            >
+              <UserCog className="w-4 h-4" />
+              <span>User Management</span>
             </button>
           </nav>
         </div>
@@ -604,6 +638,18 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
         {activeTab === 'tickets' && (
           <div className={cardClass}>
             <TicketManager role={role} userId={user.id} factoryId={initialData.factory?.id || ''} />
+          </div>
+        )}
+
+        {activeTab === 'members' && (
+          <div className={cardClass}>
+            <FactoryMembersManager isDarkMode={isDarkMode} />
+          </div>
+        )}
+
+        {activeTab === 'users' && (
+          <div className={cardClass}>
+            <UserManagement isDarkMode={isDarkMode} />
           </div>
         )}
       </div>

@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Plus, Edit2, Trash2, QrCode, Search, Filter, History } from 'lucide-react'
+import { Plus, Edit2, Trash2, QrCode, Search, Filter, History, Printer } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { Equipment, EquipmentType, MuscleGroup, EquipmentStatus } from '@/types/database'
 import EquipmentFormModal from './EquipmentFormModal'
 import QRCodeModal from './QRCodeModal'
+import BulkQRCodePrintModal from './BulkQRCodePrintModal'
 import EquipmentHistoryModal from '@/components/EquipmentHistoryModal'
 
 interface Props {
@@ -26,6 +27,7 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
   const [selectedEquipment, setSelectedEquipment] = useState<any | null>(null)
   const [showFormModal, setShowFormModal] = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
+  const [showBulkQRModal, setShowBulkQRModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [qrEquipment, setQrEquipment] = useState<any | null>(null)
   const [historyEquipment, setHistoryEquipment] = useState<any | null>(null)
@@ -173,13 +175,27 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
         <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
           Equipment Management
         </h2>
-        <button
-          onClick={handleAdd}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Equipment</span>
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowBulkQRModal(true)}
+            disabled={equipment.length === 0}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+              isDarkMode
+                ? 'bg-purple-600 hover:bg-purple-700 text-white disabled:bg-zinc-700 disabled:text-gray-500'
+                : 'bg-purple-600 hover:bg-purple-700 text-white disabled:bg-gray-300 disabled:text-gray-500'
+            } disabled:cursor-not-allowed`}
+          >
+            <Printer className="w-4 h-4" />
+            <span>Bulk Print QR</span>
+          </button>
+          <button
+            onClick={handleAdd}
+            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Equipment</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -510,6 +526,13 @@ export default function EquipmentManager({ role, userId, factoryId }: Props) {
             setShowQRModal(false)
             setQrEquipment(null)
           }}
+        />
+      )}
+
+      {showBulkQRModal && (
+        <BulkQRCodePrintModal
+          equipment={equipment}
+          onClose={() => setShowBulkQRModal(false)}
         />
       )}
 

@@ -93,6 +93,12 @@ export default function Dashboard() {
                 Welcome, {user?.email}
               </span>
               <button
+                onClick={() => router.push('/profile')}
+                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Profile
+              </button>
+              <button
                 onClick={handleSignOut}
                 className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
               >

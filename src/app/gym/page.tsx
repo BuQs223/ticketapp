@@ -45,7 +45,7 @@ export default async function GymPage() {
     .eq('gym_id', gymMember.gym_id)
     .order('created_at', { ascending: false })
 
-  // Fetch tickets for this gym
+  // Fetch tickets for this gym (only first 20)
   const { data: tickets } = await supabase
     .from('tickets')
     .select(`
@@ -58,18 +58,15 @@ export default async function GymPage() {
     `)
     .eq('gym_id', gymMember.gym_id)
     .order('created_at', { ascending: false })
+    .limit(20)
 
-  // Fetch gym members
+  // Fetch gym members (only first 20)
   const { data: members } = await supabase
     .from('gym_members')
-    .select(`
-      *,
-      user:user_id (
-        id,
-        email
-      )
-    `)
+    .select('*')
     .eq('gym_id', gymMember.gym_id)
+    .order('created_at', { ascending: false })
+    .limit(20)
 
   // Fetch notifications
   const { data: notifications } = await supabase

@@ -549,6 +549,7 @@ export default function GymDashboardClient({ user, role, initialData }: Props) {
             </h2>
             <GymTicketManager
               tickets={initialData.tickets}
+              gymId={initialData.gym?.id}
               onViewTicket={handleViewTicket}
             />
           </div>
@@ -562,9 +563,8 @@ export default function GymDashboardClient({ user, role, initialData }: Props) {
             <GymMemberManager
               members={initialData.members}
               isOwner={role === 'owner'}
-              onInviteMember={() => {
-                toast.success('Invite member feature coming soon!')
-              }}
+              gymId={initialData.gym?.id}
+              onMembersChange={handleRefreshData}
             />
           </div>
         )}

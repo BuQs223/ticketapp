@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Search, Ticket, Filter, X, Calendar, AlertCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
 import type { TicketStatus, Priority } from '@/types/database'
 
 interface TicketData {
@@ -21,16 +22,28 @@ interface TicketData {
 
 interface Props {
   tickets: TicketData[]
+  gymId: string
   onViewTicket: (ticketId: string) => void
 }
 
-export default function GymTicketManager({ tickets, onViewTicket }: Props) {
+export default function GymTicketManager({ tickets: initialTickets, gymId, onViewTicket }: Props) {
+  const [tickets, setTickets] = useState<TicketData[]>(initialTickets)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all')
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all')
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(initialTickets.length >= 20)
+  const [loadPage, setLoadPage] = useState(1)
   const ITEMS_PER_PAGE = 15
+
+  // Update tickets when initialTickets changes
+  useEffect(() => {
+    setTickets(initialTickets)
+    setHasMore(initialTickets.length >= 20)
+    setLoadPage(1)
+  }, [initialTickets])
 
   useEffect(() => {
     const checkTheme = () => {
@@ -70,6 +83,48 @@ export default function GymTicketManager({ tickets, onViewTicket }: Props) {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, statusFilter, priorityFilter])
+
+  const loadMoreTickets = async () => {
+    setIsLoadingMore(true)
+    try {
+      const nextPage = loadPage + 1
+      const response = await fetch(
+        `/api/gym/tickets/list?gym_id=${gymId}&page=${nextPage}&limit=20`
+      )
+      
+      if (!response.ok) {
+        throw new Error('Failed to load more tickets')
+      }
+
+      const data = await response.json()
+      
+      setTickets(prev => [...prev, ...data.tickets])
+      setHasMore(data.pagination.hasMore)
+      setLoadPage(nextPage)
+      
+      toast.success(`Loaded ${data.tickets.length} more tickets`, {
+        icon: '📄',
+        duration: 2000,
+        style: {
+          borderRadius: '10px',
+          background: isDarkMode ? '#18181b' : '#fff',
+          color: isDarkMode ? '#e4e4e7' : '#1f2937',
+        },
+      })
+    } catch (error) {
+      console.error('Error loading more tickets:', error)
+      toast.error('Failed to load more tickets', {
+        icon: '❌',
+        style: {
+          borderRadius: '10px',
+          background: isDarkMode ? '#18181b' : '#fff',
+          color: isDarkMode ? '#e4e4e7' : '#1f2937',
+        },
+      })
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
 
   const inputClass = useMemo(
     () =>
@@ -348,6 +403,30 @@ export default function GymTicketManager({ tickets, onViewTicket }: Props) {
               Next
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Load More Button */}
+      {hasMore && !searchTerm && statusFilter === 'all' && priorityFilter === 'all' && (
+        <div className="flex justify-center pt-4">
+          <button
+            onClick={loadMoreTickets}
+            disabled={isLoadingMore}
+            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+              isDarkMode
+                ? 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-zinc-700 disabled:text-gray-500'
+                : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500'
+            } disabled:cursor-not-allowed`}
+          >
+            {isLoadingMore ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Loading...</span>
+              </div>
+            ) : (
+              <span>Load More Tickets</span>
+            )}
+          </button>
         </div>
       )}
     </div>
