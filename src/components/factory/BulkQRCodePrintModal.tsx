@@ -29,8 +29,15 @@ export default function BulkQRCodePrintModal({ equipment, onClose }: Props) {
   const [isDarkMode, setIsDarkMode] = useState(false)
 
   useEffect(() => {
+    // Determine dark mode based on localStorage
     const savedTheme = localStorage.getItem('theme')
     setIsDarkMode(savedTheme === 'dark')
+    // Listen for theme changes if needed (optional)
+    const handleStorageChange = () => {
+      setIsDarkMode(localStorage.getItem('theme') === 'dark');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [])
 
   const toggleSelection = (id: string) => {
@@ -66,8 +73,10 @@ export default function BulkQRCodePrintModal({ equipment, onClose }: Props) {
       return
     }
 
+    // Trigger browser print dialog
     window.print()
-    
+
+    // Show success message after print dialog opens
     toast.success(`Printing ${selectedIds.size} QR code${selectedIds.size > 1 ? 's' : ''}`, {
       icon: '🖨️',
       duration: 2000,
@@ -266,66 +275,85 @@ export default function BulkQRCodePrintModal({ equipment, onClose }: Props) {
         </div>
       </div>
 
-      {/* Print Layout - Hidden on screen, visible when printing */}
+      {/* --- Print Layout - Hidden on screen, visible only when printing --- */}
       <div className="hidden print:block">
+        {/* Basic Print Styling */}
         <style jsx global>{`
           @media print {
             @page {
-              size: A4;
-              margin: 10mm;
+              size: A4 portrait; /* Explicitly set portrait */
+              margin: 10mm; /* Adjust margins as needed */
             }
             body {
               margin: 0;
               padding: 0;
+              -webkit-print-color-adjust: exact; /* Ensure colors print */
+              print-color-adjust: exact;
             }
+            /* Hide the modal UI when printing */
+            .print\\:hidden { display: none !important; }
           }
         `}</style>
-        
+
+        {/* Grid Container for Print */}
         <div className={layout === 4 ? 'print-layout-4' : 'print-layout-8'}>
           {selectedEquipment.map((item, index) => (
             <div key={item.id} className="qr-item">
               <div className="qr-code-container">
-                <QRCode 
+                {/* Render QR Code using react-qr-code */}
+                <QRCode
                   value={item.qr_code}
-                  size={layout === 4 ? 180 : 120}
-                  level="H"
+                  size={layout === 4 ? 180 : 120} // Adjust size based on layout
+                  level="H" // High error correction
+                  bgColor="#FFFFFF"
+                  fgColor="#000000"
                 />
               </div>
               <div className="qr-info">
                 <p className="qr-name">{item.name}</p>
+                {/* Added Serial Number */}
+                <p className="qr-serial">{item.serial_number}</p>
               </div>
             </div>
           ))}
         </div>
 
+        {/* Specific Styles for Print Layout */}
         <style jsx>{`
-          .print-layout-4 {
+          .print-layout-4, .print-layout-8 {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20mm;
-            padding: 10mm;
+            grid-template-columns: repeat(2, 1fr); /* 2 columns */
+            gap: 10mm; /* Space between items */
+            width: 190mm; /* A4 width minus margins (210mm - 2*10mm) */
+            margin: 0 auto;
+          }
+
+          .print-layout-4 {
+             grid-template-rows: repeat(2, auto); /* 2 rows for 4 items */
           }
 
           .print-layout-8 {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10mm;
-            padding: 5mm;
+             grid-template-rows: repeat(4, auto); /* 4 rows for 8 items */
+             gap: 5mm; /* Reduce gap for smaller items */
           }
 
           .qr-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            padding: ${layout === 4 ? '15mm' : '8mm'};
-            page-break-inside: avoid;
+            justify-content: center;
+            border: 1px solid #ccc; /* Add a light border for cutting */
+            border-radius: 4px;
+            padding: ${layout === 4 ? '10mm' : '5mm'};
+            page-break-inside: avoid; /* Prevent items splitting across pages */
             background: white;
+            box-sizing: border-box;
+            overflow: hidden; /* Prevent text overflow */
+            height: ${layout === 4 ? '128mm' : '64mm'}; /* Approximate height based on A4 */
           }
 
           .qr-code-container {
-            margin-bottom: ${layout === 4 ? '10mm' : '5mm'};
+            margin-bottom: ${layout === 4 ? '8mm' : '4mm'};
           }
 
           .qr-info {
@@ -334,23 +362,33 @@ export default function BulkQRCodePrintModal({ equipment, onClose }: Props) {
           }
 
           .qr-name {
-            font-size: ${layout === 4 ? '14pt' : '10pt'};
-            font-weight: 700;
-            color: #1f2937;
-            margin: 0;
-            word-wrap: break-word;
+            font-size: ${layout === 4 ? '12pt' : '9pt'};
+            font-weight: bold;
+            color: #000;
+            margin: 0 0 2mm 0;
+            line-height: 1.2;
+            word-wrap: break-word; /* Wrap long names */
           }
 
-          /* Page breaks for 8-per-page layout */
-          ${layout === 8 ? `
-            .qr-item:nth-child(8n) {
-              page-break-after: always;
-            }
-          ` : `
-            .qr-item:nth-child(4n) {
-              page-break-after: always;
-            }
-          `}
+          .qr-serial {
+            font-size: ${layout === 4 ? '9pt' : '7pt'};
+            color: #333;
+            margin: 0;
+            line-height: 1.2;
+             word-wrap: break-word;
+          }
+
+          /* Explicit Page Breaks */
+          .print-layout-4 .qr-item:nth-child(4n) {
+            page-break-after: always;
+          }
+          .print-layout-8 .qr-item:nth-child(8n) {
+            page-break-after: always;
+          }
+          /* Ensure the last item doesn't cause an unnecessary break */
+          .qr-item:last-child {
+             page-break-after: avoid;
+           }
         `}</style>
       </div>
     </>
