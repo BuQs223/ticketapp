@@ -20,7 +20,12 @@ interface User {
   email: string
 }
 
-export default function FactoryMembersManager({ isDarkMode }: { isDarkMode: boolean }) {
+interface Props {
+  role: 'owner' | 'approver' | 'employee'
+  isDarkMode: boolean
+}
+
+export default function FactoryMembersManager({ role, isDarkMode }: Props) {
   const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchEmail, setSearchEmail] = useState('')
@@ -284,18 +289,19 @@ export default function FactoryMembersManager({ isDarkMode }: { isDarkMode: bool
 
   return (
     <div className="space-y-6">
-      {/* Add Member Form */}
-      <div className={`rounded-lg shadow-sm border p-6 transition-colors duration-300 ${
-        isDarkMode
-          ? 'bg-zinc-900 border-zinc-800'
-          : 'bg-white border-gray-200'
-      }`}>
-        <div className="flex items-center mb-4">
-          <UserPlus className={`w-5 h-5 mr-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-          <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            Add Factory Member
-          </h3>
-        </div>
+      {/* Add Member Form - Only for Owner */}
+      {role === 'owner' ? (
+        <div className={`rounded-lg shadow-sm border p-6 transition-colors duration-300 ${
+          isDarkMode
+            ? 'bg-zinc-900 border-zinc-800'
+            : 'bg-white border-gray-200'
+        }`}>
+          <div className="flex items-center mb-4">
+            <UserPlus className={`w-5 h-5 mr-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+            <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              Add Factory Member
+            </h3>
+          </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-1">
@@ -378,6 +384,25 @@ export default function FactoryMembersManager({ isDarkMode }: { isDarkMode: bool
           </div>
         </div>
       </div>
+      ) : (
+        <div className={`rounded-lg shadow-sm border p-6 transition-colors duration-300 ${
+          isDarkMode
+            ? 'bg-blue-900/20 border-blue-800/30'
+            : 'bg-blue-50 border-blue-200'
+        }`}>
+          <div className="flex items-center">
+            <Shield className={`w-5 h-5 mr-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+            <div>
+              <h3 className={`text-sm font-semibold ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
+                View-Only Access
+              </h3>
+              <p className={`text-sm mt-1 ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>
+                👁️ You can view factory members but cannot add, edit, or remove them. Contact the factory owner for member management.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Members List */}
       <div className={`rounded-lg shadow-sm border transition-colors duration-300 ${
@@ -433,11 +458,13 @@ export default function FactoryMembersManager({ isDarkMode }: { isDarkMode: bool
                     }`}>
                       Added On
                     </th>
-                    <th className={`px-6 py-3 text-right text-xs font-medium uppercase tracking-wider ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>
-                      Actions
-                    </th>
+                    {role === 'owner' && (
+                      <th className={`px-6 py-3 text-right text-xs font-medium uppercase tracking-wider ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${isDarkMode ? 'divide-zinc-800' : 'divide-gray-200'}`}>
@@ -451,29 +478,37 @@ export default function FactoryMembersManager({ isDarkMode }: { isDarkMode: bool
                         {member.email || 'Unknown'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <select
-                          value={member.role}
-                          onChange={(e) => updateMemberRole(member.user_id, member.factory_id, e.target.value, member.email || 'Unknown')}
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role)}`}
-                        >
-                          <option value="employee">Employee</option>
-                          <option value="approver">Approver</option>
-                        </select>
+                        {role === 'owner' ? (
+                          <select
+                            value={member.role}
+                            onChange={(e) => updateMemberRole(member.user_id, member.factory_id, e.target.value, member.email || 'Unknown')}
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role)} cursor-pointer`}
+                          >
+                            <option value="employee">Employee</option>
+                            <option value="approver">Approver</option>
+                          </select>
+                        ) : (
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role)}`}>
+                            {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                          </span>
+                        )}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${
                         isDarkMode ? 'text-gray-400' : 'text-gray-600'
                       }`}>
                         {formatDate(member.created_at)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        <button
-                          onClick={() => removeMember(member.user_id, member.factory_id, member.email || 'Unknown')}
-                          className="text-red-600 hover:text-red-800 transition-colors"
-                          title="Remove member"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
+                      {role === 'owner' && (
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                          <button
+                            onClick={() => removeMember(member.user_id, member.factory_id, member.email || 'Unknown')}
+                            className="text-red-600 hover:text-red-800 transition-colors"
+                            title="Remove member"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

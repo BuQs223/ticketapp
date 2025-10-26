@@ -21,6 +21,7 @@ export default function GymManager({ role, userId, factoryId }: Props) {
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 15
   const canManageGyms = role === 'owner' || role === 'approver'
+  const canAddGyms = role === 'owner' // Only owner can add new gyms
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme')
@@ -147,7 +148,7 @@ export default function GymManager({ role, userId, factoryId }: Props) {
         <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
           Gym Management
         </h2>
-        {canManageGyms && (
+        {canAddGyms && (
           <button
             onClick={handleAdd}
             className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
@@ -157,6 +158,30 @@ export default function GymManager({ role, userId, factoryId }: Props) {
           </button>
         )}
       </div>
+
+      {/* View-Only Notice for Approver/Employee */}
+      {!canAddGyms && (
+        <div className={`mb-6 rounded-lg p-4 border ${
+          isDarkMode
+            ? 'bg-purple-900/20 border-purple-800/30'
+            : 'bg-purple-50 border-purple-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <Users className={`w-5 h-5 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+            <div>
+              <p className={`text-sm font-semibold ${isDarkMode ? 'text-purple-300' : 'text-purple-900'}`}>
+                {role === 'approver' ? 'Limited Access' : 'View-Only Access'}
+              </p>
+              <p className={`text-sm mt-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-700'}`}>
+                {role === 'approver' 
+                  ? '✓ You can approve/edit gyms but cannot create new ones. Contact the factory owner to add new gyms.'
+                  : '👁️ You can view gyms but cannot add or manage them. Contact the factory owner for gym management.'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Gym List */}
       {loading ? (

@@ -497,6 +497,27 @@ export default function GymMemberManager({ members: initialMembers, isOwner, gym
         )}
       </div>
 
+      {/* View-Only Notice for Non-Owners */}
+      {!isOwner && (
+        <div className={`rounded-lg p-4 border ${
+          isDarkMode
+            ? 'bg-blue-900/20 border-blue-800/30'
+            : 'bg-blue-50 border-blue-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <Shield className={`w-5 h-5 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+            <div>
+              <p className={`text-sm font-semibold ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>
+                View-Only Access
+              </p>
+              <p className={`text-sm mt-1 ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>
+                👁️ You can view gym members but cannot add, edit, or remove them. Contact the gym owner for member management.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Results Count */}
       <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
         Showing {filteredMembers.length} of {approvedMembers.length} team members

@@ -98,22 +98,26 @@ export default function TicketManager({ role, userId, factoryId }: Props) {
     setShowDetailModal(true)
   }
 
-  const filteredTickets = tickets.filter((ticket) => {
-    const matchesSearch = 
-      ticket.equipment?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.gyms?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.description.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter
+  const filteredTickets = useMemo(() => {
+    return tickets.filter((ticket) => {
+      const matchesSearch = 
+        ticket.equipment?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ticket.gyms?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ticket.description.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter
 
-    return matchesSearch && matchesStatus
-  })
+      return matchesSearch && matchesStatus
+    })
+  }, [tickets, searchTerm, statusFilter])
 
   // Pagination
   const totalPages = Math.ceil(filteredTickets.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const endIndex = startIndex + ITEMS_PER_PAGE
-  const paginatedTickets = filteredTickets.slice(startIndex, endIndex)
+  const paginatedTickets = useMemo(() => {
+    return filteredTickets.slice(startIndex, endIndex)
+  }, [filteredTickets, startIndex, endIndex])
 
   // Reset to page 1 when filters change
   useEffect(() => {

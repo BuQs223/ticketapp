@@ -24,6 +24,7 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
   const [loading, setLoading] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxImageUrl, setLightboxImageUrl] = useState<string>('')
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
   const [confirmations, setConfirmations] = useState<any[]>([])
 
@@ -357,7 +358,10 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
                   <img 
                     src={ticket.photo_url} 
                     alt="Ticket" 
-                    onClick={() => setLightboxOpen(true)}
+                    onClick={() => {
+                      setLightboxImageUrl(ticket.photo_url)
+                      setLightboxOpen(true)
+                    }}
                     className={`max-w-full rounded-lg border cursor-pointer transition-all ${
                       isDarkMode 
                         ? 'border-zinc-700 hover:border-zinc-600' 
@@ -365,7 +369,10 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
                     } hover:shadow-lg`}
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer"
-                    onClick={() => setLightboxOpen(true)}>
+                    onClick={() => {
+                      setLightboxImageUrl(ticket.photo_url)
+                      setLightboxOpen(true)
+                    }}>
                     <div className="bg-white/90 px-4 py-2 rounded-lg flex items-center space-x-2">
                       <ImageIcon className="w-5 h-5 text-gray-700" />
                       <span className="text-gray-700 font-medium">Click to enlarge</span>
@@ -474,51 +481,59 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
           {/* Actions */}
           <div className={`border-t pt-6 ${isDarkMode ? 'border-zinc-800' : 'border-gray-200'}`}>
             <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Actions</h4>
-            <div className="flex flex-wrap gap-2">
-              {ticket.status === 'open' && (
-                <button
-                  onClick={() => handleStatusUpdate('in_review')}
-                  disabled={loading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  Mark as In Review
-                </button>
-              )}
-              
-              {/* Factory marks work as completed */}
-              {ticket.status === 'factory_visit_approved' && 
-               !confirmations.some(c => ['factory_employee', 'factory_approver', 'factory_owner'].includes(c.confirmer_role)) && (
-                <button
-                  onClick={handleMarkAsResolved}
-                  disabled={loading}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                  Mark as Resolved
-                </button>
-              )}
-              
-              {/* Factory creates confirmation report */}
-              {ticket.status === 'resolved' && !ticket.confirmed_at && (
-                <button
-                  onClick={() => setShowConfirmationModal(true)}
-                  disabled={loading || confirmations.some(c => ['factory_employee', 'factory_approver', 'factory_owner'].includes(c.confirmer_role))}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-                >
-                  {confirmations.some(c => ['factory_employee', 'factory_approver', 'factory_owner'].includes(c.confirmer_role))
-                    ? 'Factory Confirmed ✓'
-                    : 'Create Report (Photo Required)'
-                  }
-                </button>
-              )}
-              
-              {ticket.confirmed_at && (
-                <div className={`px-4 py-2 rounded-lg ${
-                  isDarkMode ? 'bg-green-500/10 text-green-300 border border-green-500/30' : 'bg-green-100 text-green-800'
-                }`}>
-                  ✓ Fully Confirmed by Both Parties
-                </div>
-              )}
-            </div>
+            
+            {/* Employee can only view - no action buttons */}
+            {role === 'employee' ? (
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                👁️ View-only access. Contact approver or owner for ticket status changes.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {ticket.status === 'open' && (
+                  <button
+                    onClick={() => handleStatusUpdate('in_review')}
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    Mark as In Review
+                  </button>
+                )}
+                
+                {/* Factory marks work as completed - Approver and Owner only */}
+                {ticket.status === 'factory_visit_approved' && 
+                 !confirmations.some(c => ['factory_employee', 'factory_approver', 'factory_owner'].includes(c.confirmer_role)) && (
+                  <button
+                    onClick={handleMarkAsResolved}
+                    disabled={loading}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    Mark as Resolved
+                  </button>
+                )}
+                
+                {/* Factory creates confirmation report - Approver and Owner only */}
+                {ticket.status === 'resolved' && !ticket.confirmed_at && (
+                  <button
+                    onClick={() => setShowConfirmationModal(true)}
+                    disabled={loading || confirmations.some(c => ['factory_employee', 'factory_approver', 'factory_owner'].includes(c.confirmer_role))}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                  >
+                    {confirmations.some(c => ['factory_employee', 'factory_approver', 'factory_owner'].includes(c.confirmer_role))
+                      ? 'Factory Confirmed ✓'
+                      : 'Create Report (Photo Required)'
+                    }
+                  </button>
+                )}
+                
+                {ticket.confirmed_at && (
+                  <div className={`px-4 py-2 rounded-lg ${
+                    isDarkMode ? 'bg-green-500/10 text-green-300 border border-green-500/30' : 'bg-green-100 text-green-800'
+                  }`}>
+                    ✓ Fully Confirmed by Both Parties
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Confirmation Status */}
             {confirmations.length > 0 && (
@@ -555,7 +570,10 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
                         <img 
                           src={conf.confirmation_photo_url} 
                           alt="Confirmation" 
-                          onClick={() => setLightboxOpen(true)}
+                          onClick={() => {
+                            setLightboxImageUrl(conf.confirmation_photo_url)
+                            setLightboxOpen(true)
+                          }}
                           className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
                         />
                       )}
@@ -619,10 +637,13 @@ export default function TicketDetailModal({ ticket, role, userId, onClose, onUpd
       </div>
 
       {/* Image Lightbox */}
-      {lightboxOpen && ticket.photo_url && (
+      {lightboxOpen && lightboxImageUrl && (
         <ImageLightbox 
-          imageUrl={ticket.photo_url} 
-          onClose={() => setLightboxOpen(false)} 
+          imageUrl={lightboxImageUrl} 
+          onClose={() => {
+            setLightboxOpen(false)
+            setLightboxImageUrl('')
+          }} 
         />
       )}
 

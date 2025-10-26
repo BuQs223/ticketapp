@@ -430,25 +430,31 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
               <span>Tickets</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('members')}
-              className={`${tabBaseClass} ${
-                activeTab === 'members' ? tabActiveClass : tabInactiveClass
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              <span>Members</span>
-            </button>
+            {/* Only show Members tab for owner and approver */}
+            {(role === 'owner' || role === 'approver') && (
+              <button
+                onClick={() => setActiveTab('members')}
+                className={`${tabBaseClass} ${
+                  activeTab === 'members' ? tabActiveClass : tabInactiveClass
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Members</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`${tabBaseClass} ${
-                activeTab === 'users' ? tabActiveClass : tabInactiveClass
-              }`}
-            >
-              <UserCog className="w-4 h-4" />
-              <span>User Management</span>
-            </button>
+            {/* Only show User Management tab for owner */}
+            {role === 'owner' && (
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`${tabBaseClass} ${
+                  activeTab === 'users' ? tabActiveClass : tabInactiveClass
+                }`}
+              >
+                <UserCog className="w-4 h-4" />
+                <span>User Management</span>
+              </button>
+            )}
           </nav>
         </div>
 
@@ -643,7 +649,7 @@ export default function FactoryDashboardClient({ user, role, initialData }: Prop
 
         {activeTab === 'members' && (
           <div className={cardClass}>
-            <FactoryMembersManager isDarkMode={isDarkMode} />
+            <FactoryMembersManager role={role} isDarkMode={isDarkMode} />
           </div>
         )}
 
