@@ -31,7 +31,7 @@ export default async function GymPage() {
     redirect('/dashboard')
   }
 
-  // Fetch gym details
+  // Fetch gym detailss
   const { data: gym } = await supabase
     .from('gyms')
     .select('*')
